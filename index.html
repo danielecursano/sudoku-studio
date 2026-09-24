@@ -49,9 +49,12 @@
 
         <div class="flex items-center space-x-2 sm:space-x-4">
             <!-- Timer widget -->
-            <div class="hidden sm:flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm font-medium">
-                <i data-lucide="clock" class="w-4 h-4 text-indigo-500"></i>
-                <span id="timer-display">00:00</span>
+            <div class="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-slate-700/50 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium">
+                <i data-lucide="clock" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                <span id="timer-display" class="font-mono tabular-nums">00:00</span>
+                <button id="btn-reset-timer" onclick="resetTimer()" class="p-1 rounded text-slate-400 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition" title="Reset Timer" aria-label="Reset Timer">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                </button>
             </div>
 
             <!-- Theme Toggle -->
@@ -84,11 +87,11 @@
                 <p class="text-xs text-slate-500 dark:text-slate-400">Click cells on the board and enter numbers to establish your custom puzzle layout. When ready, switch to Play Mode.</p>
 
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="btn-mode-setup" onclick="setAppMode('setup')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-amber-500 text-white shadow-sm transition flex items-center justify-center space-x-1.5">
+                    <button id="btn-mode-setup" onclick="switchMode('setup')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-amber-500 text-white shadow-sm transition flex items-center justify-center space-x-1.5">
                         <i data-lucide="edit" class="w-4 h-4"></i>
                         <span>Setup Givens</span>
                     </button>
-                    <button id="btn-mode-play" onclick="setAppMode('play')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5">
+                    <button id="btn-mode-play" onclick="switchMode('play')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5">
                         <i data-lucide="play" class="w-4 h-4"></i>
                         <span>Play Puzzle</span>
                     </button>
@@ -168,12 +171,12 @@
             <!-- Sudoku Grid Container -->
             <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-[520px] aspect-square flex items-center justify-center relative">
                 
-                <!-- SVG Overlay for Variant Constraints (e.g., Anti-Knight dots/lines, Diagonals, Windows) -->
-                <svg id="variant-overlay" class="absolute inset-0 w-full h-full pointer-events-none p-3 sm:p-4 z-10 overflow-visible"></svg>
-
-                <div id="sudoku-grid" class="grid grid-cols-9 w-full h-full gap-[1px] bg-slate-300 dark:bg-slate-600 border-2 border-slate-800 dark:border-slate-200 rounded-lg overflow-hidden shadow-inner relative z-20">
+                <div id="sudoku-grid" class="grid grid-cols-9 w-full h-full gap-[1px] bg-slate-300 dark:bg-slate-600 border-2 border-slate-800 dark:border-slate-200 rounded-lg overflow-hidden shadow-inner relative z-10">
                     <!-- Dynamic 81 cells injected via JS -->
                 </div>
+
+                <!-- SVG Overlay for Variant Constraints (e.g., Anti-Knight dots/lines, Diagonals) -->
+                <svg id="variant-overlay" class="absolute inset-3 sm:inset-4 pointer-events-none z-20 overflow-visible"></svg>
 
                 <!-- Status Banner Overlay -->
                 <div id="status-banner" class="absolute inset-x-6 top-6 z-30 transition-all duration-300 transform -translate-y-20 opacity-0 pointer-events-none">
@@ -205,7 +208,7 @@
     </main>
 
     <!-- Variant Selection Modal -->
-    <div id="variant-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="variant-modal" onclick="if(event.target === this) closeVariantModal()" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-6 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between">
                 <div>
@@ -224,7 +227,7 @@
     </div>
 
     <!-- Custom Rule Builder Modal -->
-    <div id="rule-builder-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="rule-builder-modal" onclick="if(event.target === this) closeRuleBuilderModal()" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-5 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between">
                 <div>
@@ -283,6 +286,7 @@ return true;</textarea>
         let appMode = 'setup'; // 'setup' or 'play'
         let timerSeconds = 0;
         let timerInterval = null;
+        let bannerTimeout = null;
 
         // Championship Variants
         const VARIANTS = {
@@ -307,30 +311,7 @@ return true;</textarea>
                     }
                     return true;
                 },
-                drawOverlay: () => {
-                    const svg = document.getElementById('variant-overlay');
-                    svg.innerHTML = '';
-                    const { r, c } = selectedCell;
-                    if (r === undefined || c === undefined) return;
-
-                    // Highlight the 8 possible knight move target cells for the selected cell
-                    const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-                    let html = '';
-                    for (let [dr, dc] of moves) {
-                        let nr = r + dr, nc = c + dc;
-                        if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
-                            // Calculate percentage coordinates for the cell center
-                            let cx = (nc + 0.5) * (100 / 9);
-                            let cy = (nr + 0.5) * (100 / 9);
-                            let selCx = (c + 0.5) * (100 / 9);
-                            let selCy = (r + 0.5) * (100 / 9);
-
-                            html += `<line x1="${selCx}%" y1="${selCy}%" x2="${cx}%" y2="${cy}%" stroke="rgba(239, 68, 68, 0.4)" stroke-width="2.5" stroke-dasharray="4 4" />`;
-                            html += `<circle cx="${cx}%" cy="${cy}%" r="4.5" fill="rgba(239, 68, 68, 0.8)" />`;
-                        }
-                    }
-                    svg.innerHTML = html;
-                }
+                drawOverlay: () => {}
             },
             king: {
                 id: 'king',
@@ -357,21 +338,22 @@ return true;</textarea>
                 checkCustom: (g, r, c, val) => {
                     if (r === c) {
                         for (let i = 0; i < 9; i++) {
-                            if (i !== c && g[i][i] === val) return false;
+                            if (i !== r && g[i][i] === val) return false;
                         }
                     }
                     if (r + c === 8) {
                         for (let i = 0; i < 9; i++) {
-                            if (i !== c && g[i][8 - i] === val) return false;
+                            if (i !== r && g[i][8 - i] === val) return false;
                         }
                     }
                     return true;
                 },
                 drawOverlay: () => {
                     const svg = document.getElementById('variant-overlay');
+                    if (!svg) return;
                     svg.innerHTML = `
-                        <line x1="0%" y1="0%" x2="100%" y2="100%" stroke="rgba(99, 102, 241, 0.25)" stroke-width="3" stroke-dasharray="6 6" />
-                        <line x1="0%" y1="100%" x2="100%" y2="0%" stroke="rgba(99, 102, 241, 0.25)" stroke-width="3" stroke-dasharray="6 6" />
+                        <line x1="0%" y1="0%" x2="100%" y2="100%" stroke="rgba(99, 102, 241, 0.35)" stroke-width="3" stroke-dasharray="6 6" />
+                        <line x1="0%" y1="100%" x2="100%" y2="0%" stroke="rgba(99, 102, 241, 0.35)" stroke-width="3" stroke-dasharray="6 6" />
                     `;
                 }
             },
@@ -427,13 +409,19 @@ return true;</textarea>
             }, 1000);
         }
 
+        function resetTimer() {
+            startTimer();
+            showBanner('Timer reset to 00:00', 'info');
+        }
+
         function updateTimerDisplay() {
             const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
             const secs = String(timerSeconds % 60).padStart(2, '0');
-            document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+            const el = document.getElementById('timer-display');
+            if (el) el.innerText = `${mins}:${secs}`;
         }
 
-        function setAppMode(mode) {
+        function setAppMode(mode, lockGivens = true) {
             appMode = mode;
             const badge = document.getElementById('mode-badge');
             const btnSetup = document.getElementById('btn-mode-setup');
@@ -444,21 +432,33 @@ return true;</textarea>
                 badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300';
                 btnSetup.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-amber-500 text-white shadow-sm transition flex items-center justify-center space-x-1.5';
                 btnPlay.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5';
-                showBanner('Setup Mode: Click cells and type numbers to create your custom layout.', 'info');
             } else {
-                // Lock current grid values as fixed givens
-                for (let r = 0; r < 9; r++) {
-                    for (let c = 0; c < 9; c++) {
-                        givens[r][c] = (grid[r][c] !== 0);
+                if (lockGivens) {
+                    // Lock current grid values as fixed givens
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            givens[r][c] = (grid[r][c] !== 0);
+                        }
                     }
                 }
                 badge.innerText = 'Play Mode';
                 badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300';
                 btnPlay.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition flex items-center justify-center space-x-1.5';
                 btnSetup.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5';
-                showBanner('Play Mode Active! Solve your custom layout.', 'success');
             }
             renderGrid();
+        }
+
+        function switchMode(mode) {
+            if (mode === appMode) return;
+            if (mode === 'setup') {
+                setAppMode('setup');
+                showBanner('Setup Mode: Click cells and type numbers to create your custom layout.', 'info');
+            } else {
+                saveHistory();
+                setAppMode('play', true);
+                showBanner('Play Mode Active! Solve your custom layout.', 'success');
+            }
         }
 
         function clearEntireBoard() {
@@ -470,6 +470,7 @@ return true;</textarea>
                     pencilMarks[r][c].clear();
                 }
             }
+            startTimer();
             renderGrid();
             showBanner('Board cleared completely.', 'info');
         }
@@ -494,8 +495,8 @@ return true;</textarea>
                     pencilMarks[r][c].clear();
                 }
             }
-            appMode = 'play';
-            setAppMode('play');
+            setAppMode('play', false);
+            startTimer();
             renderGrid();
             showBanner('Sample custom puzzle loaded!', 'success');
         }
@@ -504,10 +505,11 @@ return true;</textarea>
             const stateSnapshot = {
                 grid: grid.map(row => [...row]),
                 givens: givens.map(row => [...row]),
+                pencilMarks: pencilMarks.map(row => row.map(set => new Set(set))),
                 appMode: appMode
             };
             historyStack.push(stateSnapshot);
-            if (historyStack.length > 30) historyStack.shift();
+            if (historyStack.length > 50) historyStack.shift();
         }
 
         function undoAction() {
@@ -516,10 +518,11 @@ return true;</textarea>
                 return;
             }
             const prevState = historyStack.pop();
-            grid = prevState.grid;
-            givens = prevState.givens;
+            grid = prevState.grid.map(row => [...row]);
+            givens = prevState.givens.map(row => [...row]);
+            pencilMarks = prevState.pencilMarks.map(row => row.map(set => new Set(set)));
             appMode = prevState.appMode;
-            setAppMode(appMode);
+            setAppMode(appMode, false);
             renderGrid();
             showBanner('Last action undone.', 'info');
         }
@@ -543,7 +546,7 @@ return true;</textarea>
                     const selectedVal = grid[selectedCell.r][selectedCell.c];
 
                     if (isSelected) {
-                        cellDiv.classList.add('bg-indigo-100', 'dark:bg-indigo-950/80', 'ring-2', 'ring-indigo-600', 'z-10');
+                        cellDiv.classList.add('bg-indigo-100', 'dark:bg-indigo-950/80', 'ring-2', 'ring-indigo-600');
                     } else if (selectedVal !== 0 && val === selectedVal) {
                         cellDiv.classList.add('bg-indigo-50', 'dark:bg-indigo-900/30');
                     } else if (selectedCell.r === r || selectedCell.c === c || (Math.floor(selectedCell.r/3) === Math.floor(r/3) && Math.floor(selectedCell.c/3) === Math.floor(c/3))) {
@@ -590,38 +593,50 @@ return true;</textarea>
                 }
             }
 
-            currentVariant.drawOverlay();
+            const svg = document.getElementById('variant-overlay');
+            if (svg) {
+                svg.innerHTML = '';
+                if (currentVariant && currentVariant.drawOverlay) {
+                    currentVariant.drawOverlay();
+                }
+            }
         }
 
         function isPlacementValid(r, c, val, skipCurrentCheck = false) {
             let temp = grid[r][c];
             if (skipCurrentCheck) grid[r][c] = 0;
 
-            for (let i = 0; i < 9; i++) {
-                if (grid[r][i] === val || grid[i][c] === val) {
-                    if (skipCurrentCheck) grid[r][c] = temp;
-                    return false;
-                }
-            }
-            let br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
-            for (let i = 0; i < 3; i++) {
-                for (let j = 0; j < 3; j++) {
-                    if (grid[br + i][bc + j] === val) {
-                        if (skipCurrentCheck) grid[r][c] = temp;
+            try {
+                for (let i = 0; i < 9; i++) {
+                    if (grid[r][i] === val || grid[i][c] === val) {
                         return false;
                     }
                 }
-            }
+                let br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        if (grid[br + i][bc + j] === val) {
+                            return false;
+                        }
+                    }
+                }
 
-            let variantValid = true;
-            if (customVerifierFunc) {
-                variantValid = customVerifierFunc(grid, r, c, val);
-            } else if (currentVariant && currentVariant.checkCustom) {
-                variantValid = currentVariant.checkCustom(grid, r, c, val);
-            }
+                let variantValid = true;
+                if (customVerifierFunc) {
+                    try {
+                        variantValid = !!customVerifierFunc(grid, r, c, val);
+                    } catch (e) {
+                        console.error('Custom verifier error:', e);
+                        variantValid = false;
+                    }
+                } else if (currentVariant && currentVariant.checkCustom) {
+                    variantValid = currentVariant.checkCustom(grid, r, c, val);
+                }
 
-            if (skipCurrentCheck) grid[r][c] = temp;
-            return variantValid;
+                return variantValid;
+            } finally {
+                if (skipCurrentCheck) grid[r][c] = temp;
+            }
         }
 
         function togglePencilMode() {
@@ -638,6 +653,9 @@ return true;</textarea>
         function inputNumber(num) {
             const { r, c } = selectedCell;
             if (appMode === 'play' && givens[r][c]) return;
+
+            if (num === 0 && grid[r][c] === 0 && pencilMarks[r][c].size === 0) return;
+            if (pencilMode && appMode === 'play' && grid[r][c] !== 0) return;
 
             saveHistory();
 
@@ -663,24 +681,68 @@ return true;</textarea>
                 }
             }
 
+            if (!timerInterval && appMode === 'play') {
+                timerInterval = setInterval(() => {
+                    timerSeconds++;
+                    updateTimerDisplay();
+                }, 1000);
+            }
+
             renderGrid();
             if (appMode === 'play') checkWinCondition();
         }
 
         function handleKeyPress(e) {
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                closeVariantModal();
+                closeRuleBuilderModal();
+                return;
+            }
+
+            const isVariantModalOpen = !document.getElementById('variant-modal').classList.contains('hidden');
+            const isRuleModalOpen = !document.getElementById('rule-builder-modal').classList.contains('hidden');
+            if (isVariantModalOpen || isRuleModalOpen) return;
+
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undoAction();
+                return;
+            }
+
             const { r, c } = selectedCell;
             if (e.key >= '1' && e.key <= '9') {
                 inputNumber(parseInt(e.key));
             } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+                e.preventDefault();
                 inputNumber(0);
-            } else if (e.key === 'ArrowUp' && r > 0) { selectedCell.r--; renderGrid(); }
-            else if (e.key === 'ArrowDown' && r < 8) { selectedCell.r++; renderGrid(); }
-            else if (e.key === 'ArrowLeft' && c > 0) { selectedCell.c--; renderGrid(); }
-            else if (e.key === 'ArrowRight' && c < 8) { selectedCell.c++; renderGrid(); }
-            else if (e.key.toLowerCase() === 'p') { togglePencilMode(); }
+            } else if (e.key === 'ArrowUp' && r > 0) {
+                e.preventDefault();
+                selectedCell.r--;
+                renderGrid();
+            } else if (e.key === 'ArrowDown' && r < 8) {
+                e.preventDefault();
+                selectedCell.r++;
+                renderGrid();
+            } else if (e.key === 'ArrowLeft' && c > 0) {
+                e.preventDefault();
+                selectedCell.c--;
+                renderGrid();
+            } else if (e.key === 'ArrowRight' && c < 8) {
+                e.preventDefault();
+                selectedCell.c++;
+                renderGrid();
+            } else if (e.key.toLowerCase() === 'p') {
+                togglePencilMode();
+            }
         }
 
         function autoAnnotateAll() {
+            saveHistory();
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
                     if (grid[r][c] === 0) {
@@ -698,9 +760,10 @@ return true;</textarea>
         }
 
         function clearPlayerNotes() {
+            saveHistory();
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
-                    if (!givens[r][c]) pencilMarks[r][c].clear();
+                    pencilMarks[r][c].clear();
                 }
             }
             renderGrid();
@@ -727,8 +790,13 @@ return true;</textarea>
             } else if (!isComplete) {
                 showBanner('Current layout is valid so far, but incomplete.', 'info');
             } else {
-                showBanner('Congratulations! Custom puzzle solved successfully!', 'success');
-                if (timerInterval) clearInterval(timerInterval);
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+                const secs = String(timerSeconds % 60).padStart(2, '0');
+                showBanner(`Congratulations! Puzzle solved successfully in ${mins}:${secs}!`, 'success');
             }
         }
 
@@ -738,12 +806,19 @@ return true;</textarea>
                 for (let c = 0; c < 9; c++) {
                     if (grid[r][c] === 0 || !isPlacementValid(r, c, grid[r][c], true)) {
                         isComplete = false;
+                        break;
                     }
                 }
+                if (!isComplete) break;
             }
             if (isComplete) {
-                if (timerInterval) clearInterval(timerInterval);
-                showBanner('Fantastic! Custom puzzle completed perfectly!', 'success');
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+                const secs = String(timerSeconds % 60).padStart(2, '0');
+                showBanner(`Fantastic! Custom puzzle completed perfectly in ${mins}:${secs}!`, 'success');
             }
         }
 
@@ -751,6 +826,11 @@ return true;</textarea>
             const banner = document.getElementById('status-banner');
             const content = document.getElementById('status-banner-content');
             
+            if (bannerTimeout) {
+                clearTimeout(bannerTimeout);
+                bannerTimeout = null;
+            }
+
             let bgClass = 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800';
             let iconName = 'check-circle';
             if (type === 'error') {
@@ -768,7 +848,7 @@ return true;</textarea>
             banner.classList.remove('-translate-y-20', 'opacity-0');
             banner.classList.add('translate-y-0', 'opacity-100');
 
-            setTimeout(() => { hideBanner(); }, 4000);
+            bannerTimeout = setTimeout(() => { hideBanner(); }, 4000);
         }
 
         function hideBanner() {
@@ -805,7 +885,6 @@ return true;</textarea>
             customVerifierFunc = null;
             document.getElementById('current-variant-name').innerText = currentVariant.name;
             document.getElementById('current-variant-desc').innerText = currentVariant.description;
-            document.getElementById('variant-overlay').innerHTML = '';
             closeVariantModal();
             renderGrid();
         }

@@ -24,7 +24,7 @@ An advanced, interactive browser-based studio for creating, playing, and verifyi
 
 ### 🏆 Championship Variants Supported
 1. **Standard Sudoku**: Traditional 9x9 grid with rows, columns, and 3x3 blocks containing digits 1–9.
-2. **Anti-Knight Sudoku**: Cells separated by a chess knight move (L-shape: 2 by 1) cannot contain identical digits. Includes an interactive SVG overlay showing target knight jumps for the selected cell.
+2. **Anti-Knight Sudoku**: Cells separated by a chess knight move (L-shape: 2 by 1) cannot contain identical digits.
 3. **Anti-King Sudoku**: Diagonally and orthogonally adjacent cells (chess king move) cannot contain the same digit.
 4. **Diagonal Sudoku (X-Sudoku)**: Both main diagonals (top-left to bottom-right, bottom-left to top-right) must contain digits 1–9 without duplicates. Features visual dashed diagonal guide lines across the board.
 5. **Non-Consecutive Sudoku**: Orthogonally adjacent cells cannot contain consecutive numbers (e.g. adjacent 4 and 5 are disallowed).
