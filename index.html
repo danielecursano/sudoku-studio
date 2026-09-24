@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Sudoku Variant Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sudoku-cell {
+            aspect-ratio: 1;
+            user-select: none;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 9999px; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 h-full flex flex-col overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 lg:px-8 py-3 flex items-center justify-between shrink-0 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md flex items-center justify-center">
+                <i data-lucide="grid" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">Sudoku Variant Studio</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Custom Setup, Championship Variants & Solvers</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 sm:space-x-4">
+            <!-- Timer widget -->
+            <div class="hidden sm:flex items-center space-x-2 bg-slate-100 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm font-medium">
+                <i data-lucide="clock" class="w-4 h-4 text-indigo-500"></i>
+                <span id="timer-display">00:00</span>
+            </div>
+
+            <!-- Theme Toggle -->
+            <button id="theme-toggle" class="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Toggle Theme">
+                <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+                <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            </button>
+
+            <!-- Rules Modal Trigger -->
+            <button id="btn-open-rules" onclick="openVariantModal()" class="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg text-sm font-medium transition">
+                <i data-lucide="book-open" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Variants & Rules</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start overflow-y-auto">
+        
+        <!-- Left Column: Setup & Tools -->
+        <div class="lg:col-span-4 space-y-4">
+            
+            <!-- Setup Mode / Gameplay Status Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Mode Control</h2>
+                    <span id="mode-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Setup Givens</span>
+                </div>
+
+                <p class="text-xs text-slate-500 dark:text-slate-400">Click cells on the board and enter numbers to establish your custom puzzle layout. When ready, switch to Play Mode.</p>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-mode-setup" onclick="setAppMode('setup')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-amber-500 text-white shadow-sm transition flex items-center justify-center space-x-1.5">
+                        <i data-lucide="edit" class="w-4 h-4"></i>
+                        <span>Setup Givens</span>
+                    </button>
+                    <button id="btn-mode-play" onclick="setAppMode('play')" class="py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5">
+                        <i data-lucide="play" class="w-4 h-4"></i>
+                        <span>Play Puzzle</span>
+                    </button>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap gap-2">
+                    <button onclick="clearEntireBoard()" class="flex-1 py-2 px-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Clear Board</span>
+                    </button>
+                    <button onclick="loadSamplePreset()" class="flex-1 py-2 px-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span>Sample Layout</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Variant Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Active Variant</h2>
+                    <button onclick="openVariantModal()" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Change</button>
+                </div>
+                <div id="variant-info-box" class="p-3 bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl">
+                    <h3 id="current-variant-name" class="font-semibold text-sm text-indigo-900 dark:text-indigo-200">Standard Sudoku</h3>
+                    <p id="current-variant-desc" class="text-xs text-slate-600 dark:text-slate-400 mt-1">Standard 9x9 grid with rows, columns, and 3x3 boxes containing digits 1-9.</p>
+                </div>
+            </div>
+
+            <!-- Tools & Helpers Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-3">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Tools & Helpers</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-pencil-mode" onclick="togglePencilMode()" class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                        <i data-lucide="edit-3" class="w-4 h-4 text-indigo-500"></i>
+                        <span>Pencil: <strong id="pencil-status">OFF</strong></span>
+                    </button>
+                    <button onclick="autoAnnotateAll()" class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-700 transition" title="Compute pencil marks for all empty cells">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+                        <span>Annotate All</span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="checkSolution()" class="flex items-center justify-center space-x-1 py-2 px-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-medium hover:bg-emerald-100 transition">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                        <span>Validate</span>
+                    </button>
+                    <button onclick="undoAction()" class="flex items-center justify-center space-x-1 py-2 px-2 bg-slate-50 dark:bg-slate-700/40 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium hover:bg-slate-100 transition">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>Undo</span>
+                    </button>
+                    <button onclick="clearPlayerNotes()" class="flex items-center justify-center space-x-1 py-2 px-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-medium hover:bg-rose-100 transition">
+                        <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+                        <span>Clr Notes</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Rule Builder Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Custom Verifier</h2>
+                    <span class="text-[10px] bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">Dynamic JS</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Write a custom JavaScript function to validate unique board rules instantly.</p>
+                <button onclick="openRuleBuilderModal()" class="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-medium shadow-sm transition flex items-center justify-center space-x-2">
+                    <i data-lucide="code" class="w-4 h-4"></i>
+                    <span>Open Rule Builder</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Sudoku Board & Numpad -->
+        <div class="lg:col-span-8 flex flex-col items-center space-y-4">
+            
+            <!-- Sudoku Grid Container -->
+            <div class="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-[520px] aspect-square flex items-center justify-center relative">
+                
+                <!-- SVG Overlay for Variant Constraints (e.g., Anti-Knight dots/lines, Diagonals, Windows) -->
+                <svg id="variant-overlay" class="absolute inset-0 w-full h-full pointer-events-none p-3 sm:p-4 z-10 overflow-visible"></svg>
+
+                <div id="sudoku-grid" class="grid grid-cols-9 w-full h-full gap-[1px] bg-slate-300 dark:bg-slate-600 border-2 border-slate-800 dark:border-slate-200 rounded-lg overflow-hidden shadow-inner relative z-20">
+                    <!-- Dynamic 81 cells injected via JS -->
+                </div>
+
+                <!-- Status Banner Overlay -->
+                <div id="status-banner" class="absolute inset-x-6 top-6 z-30 transition-all duration-300 transform -translate-y-20 opacity-0 pointer-events-none">
+                    <div id="status-banner-content" class="p-4 rounded-2xl shadow-lg border text-center font-semibold text-sm flex items-center justify-center space-x-2">
+                        <!-- Content injected via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Virtual Numpad -->
+            <div class="w-full max-w-[520px] bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 grid grid-cols-10 gap-1.5 sm:gap-2">
+                <button onclick="inputNumber(1)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">1</button>
+                <button onclick="inputNumber(2)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">2</button>
+                <button onclick="inputNumber(3)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">3</button>
+                <button onclick="inputNumber(4)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">4</button>
+                <button onclick="inputNumber(5)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">5</button>
+                <button onclick="inputNumber(6)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">6</button>
+                <button onclick="inputNumber(7)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">7</button>
+                <button onclick="inputNumber(8)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">8</button>
+                <button onclick="inputNumber(9)" class="numpad-btn bg-slate-100 dark:bg-slate-700 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-800 dark:text-slate-100 font-bold text-lg rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm">9</button>
+                <button onclick="inputNumber(0)" class="numpad-btn bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 font-bold text-xs rounded-xl py-3 flex flex-col items-center justify-center transition shadow-sm" title="Erase Cell">
+                    <i data-lucide="delete" class="w-4 h-4"></i>
+                    <span class="text-[9px] mt-0.5">Del</span>
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Variant Selection Modal -->
+    <div id="variant-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">Select Championship Variant</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Choose unique constraint rules for your custom layout</p>
+                </div>
+                <button onclick="closeVariantModal()" class="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="variant-list-container">
+                <!-- Injected variant cards -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Rule Builder Modal -->
+    <div id="rule-builder-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">Custom Rule & Verifier Builder</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Write a custom JavaScript function that validates your variant constraints.</p>
+                </div>
+                <button onclick="closeRuleBuilderModal()" class="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Variant Name</label>
+                    <input type="text" id="custom-rule-name" value="My Custom Variant" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mb-1">Description & Rule Instructions</label>
+                    <textarea id="custom-rule-desc" rows="2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">Cells with special custom constraints.</textarea>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-semibold uppercase text-slate-700 dark:text-slate-300">Verifier Function `isValid(grid, r, c, val)`</label>
+                        <span class="text-[10px] text-slate-400">grid is 9x9 2D array of numbers (0 for empty)</span>
+                    </div>
+                    <textarea id="custom-rule-code" rows="8" class="w-full font-mono text-xs p-3 bg-slate-900 text-purple-300 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed">// Example: Anti-Knight variant check
+const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+for (let [dr, dc] of moves) {
+    let nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+        if (grid[nr][nc] === val) return false;
+    }
+}
+return true;</textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                <button onclick="closeRuleBuilderModal()" class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                <button onclick="applyCustomRule()" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-medium shadow-sm transition">Apply & Play Variant</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State variables
+        let grid = Array(9).fill(0).map(() => Array(9).fill(0));
+        let givens = Array(9).fill(0).map(() => Array(9).fill(false)); // Fixed numbers set in setup mode
+        let pencilMarks = Array(9).fill(0).map(() => Array(9).fill(0).map(() => new Set()));
+        let historyStack = [];
+
+        let selectedCell = { r: 0, c: 0 };
+        let pencilMode = false;
+        let appMode = 'setup'; // 'setup' or 'play'
+        let timerSeconds = 0;
+        let timerInterval = null;
+
+        // Championship Variants
+        const VARIANTS = {
+            standard: {
+                id: 'standard',
+                name: 'Standard Sudoku',
+                description: 'Classic 9x9 grid. Each row, column, and 3x3 box must contain digits 1-9 without repetition.',
+                checkCustom: (g, r, c, val) => true,
+                drawOverlay: () => {}
+            },
+            knight: {
+                id: 'knight',
+                name: "Anti-Knight Sudoku",
+                description: 'Standard rules apply, plus cells separated by a chess knight move (2 squares in one direction and 1 square perpendicularly, forming an L-shape) cannot contain the same digit.',
+                checkCustom: (g, r, c, val) => {
+                    const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                    for (let [dr, dc] of moves) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+                            if (g[nr][nc] === val) return false;
+                        }
+                    }
+                    return true;
+                },
+                drawOverlay: () => {
+                    const svg = document.getElementById('variant-overlay');
+                    svg.innerHTML = '';
+                    const { r, c } = selectedCell;
+                    if (r === undefined || c === undefined) return;
+
+                    // Highlight the 8 possible knight move target cells for the selected cell
+                    const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                    let html = '';
+                    for (let [dr, dc] of moves) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+                            // Calculate percentage coordinates for the cell center
+                            let cx = (nc + 0.5) * (100 / 9);
+                            let cy = (nr + 0.5) * (100 / 9);
+                            let selCx = (c + 0.5) * (100 / 9);
+                            let selCy = (r + 0.5) * (100 / 9);
+
+                            html += `<line x1="${selCx}%" y1="${selCy}%" x2="${cx}%" y2="${cy}%" stroke="rgba(239, 68, 68, 0.4)" stroke-width="2.5" stroke-dasharray="4 4" />`;
+                            html += `<circle cx="${cx}%" cy="${cy}%" r="4.5" fill="rgba(239, 68, 68, 0.8)" />`;
+                        }
+                    }
+                    svg.innerHTML = html;
+                }
+            },
+            king: {
+                id: 'king',
+                name: "Anti-King Sudoku",
+                description: 'Standard rules apply, plus diagonally or orthogonally adjacent cells (chess king move) cannot contain the same digit.',
+                checkCustom: (g, r, c, val) => {
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            let nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+                                if (g[nr][nc] === val) return false;
+                            }
+                        }
+                    }
+                    return true;
+                },
+                drawOverlay: () => {}
+            },
+            diagonal: {
+                id: 'diagonal',
+                name: "Diagonal (X-Sudoku)",
+                description: 'Standard rules apply, plus both main diagonals (top-left to bottom-right, bottom-left to top-right) must contain digits 1-9.',
+                checkCustom: (g, r, c, val) => {
+                    if (r === c) {
+                        for (let i = 0; i < 9; i++) {
+                            if (i !== c && g[i][i] === val) return false;
+                        }
+                    }
+                    if (r + c === 8) {
+                        for (let i = 0; i < 9; i++) {
+                            if (i !== c && g[i][8 - i] === val) return false;
+                        }
+                    }
+                    return true;
+                },
+                drawOverlay: () => {
+                    const svg = document.getElementById('variant-overlay');
+                    svg.innerHTML = `
+                        <line x1="0%" y1="0%" x2="100%" y2="100%" stroke="rgba(99, 102, 241, 0.25)" stroke-width="3" stroke-dasharray="6 6" />
+                        <line x1="0%" y1="100%" x2="100%" y2="0%" stroke="rgba(99, 102, 241, 0.25)" stroke-width="3" stroke-dasharray="6 6" />
+                    `;
+                }
+            },
+            nonconsecutive: {
+                id: 'nonconsecutive',
+                name: "Non-Consecutive Sudoku",
+                description: 'Orthogonally adjacent cells cannot contain consecutive numbers (e.g., if cell is 5, neighbors cannot be 4 or 6).',
+                checkCustom: (g, r, c, val) => {
+                    const neighbors = [[-1,0],[1,0],[0,-1],[0,1]];
+                    for (let [dr, dc] of neighbors) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+                            let nval = g[nr][nc];
+                            if (nval !== 0 && Math.abs(nval - val) === 1) return false;
+                        }
+                    }
+                    return true;
+                },
+                drawOverlay: () => {}
+            }
+        };
+
+        let currentVariant = VARIANTS.standard;
+        let customVerifierFunc = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            
+            // Theme toggle listener
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            themeToggleBtn.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            });
+
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+
+            document.addEventListener('keydown', handleKeyPress);
+            populateVariantModalList();
+            renderGrid();
+            startTimer();
+        });
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerSeconds = 0;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+        }
+
+        function setAppMode(mode) {
+            appMode = mode;
+            const badge = document.getElementById('mode-badge');
+            const btnSetup = document.getElementById('btn-mode-setup');
+            const btnPlay = document.getElementById('btn-mode-play');
+
+            if (mode === 'setup') {
+                badge.innerText = 'Setup Givens';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300';
+                btnSetup.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-amber-500 text-white shadow-sm transition flex items-center justify-center space-x-1.5';
+                btnPlay.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5';
+                showBanner('Setup Mode: Click cells and type numbers to create your custom layout.', 'info');
+            } else {
+                // Lock current grid values as fixed givens
+                for (let r = 0; r < 9; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        givens[r][c] = (grid[r][c] !== 0);
+                    }
+                }
+                badge.innerText = 'Play Mode';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300';
+                btnPlay.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition flex items-center justify-center space-x-1.5';
+                btnSetup.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition flex items-center justify-center space-x-1.5';
+                showBanner('Play Mode Active! Solve your custom layout.', 'success');
+            }
+            renderGrid();
+        }
+
+        function clearEntireBoard() {
+            saveHistory();
+            grid = Array(9).fill(0).map(() => Array(9).fill(0));
+            givens = Array(9).fill(0).map(() => Array(9).fill(false));
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    pencilMarks[r][c].clear();
+                }
+            }
+            renderGrid();
+            showBanner('Board cleared completely.', 'info');
+        }
+
+        function loadSamplePreset() {
+            saveHistory();
+            const sample = [
+                [5,3,0,0,7,0,0,0,0],
+                [6,0,0,1,9,5,0,0,0],
+                [0,9,8,0,0,0,0,6,0],
+                [8,0,0,0,6,0,0,0,3],
+                [4,0,0,8,0,3,0,0,1],
+                [7,0,0,0,2,0,0,0,6],
+                [0,6,0,0,0,0,2,8,0],
+                [0,0,0,4,1,9,0,0,5],
+                [0,0,0,0,8,0,0,7,9]
+            ];
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    grid[r][c] = sample[r][c];
+                    givens[r][c] = (sample[r][c] !== 0);
+                    pencilMarks[r][c].clear();
+                }
+            }
+            appMode = 'play';
+            setAppMode('play');
+            renderGrid();
+            showBanner('Sample custom puzzle loaded!', 'success');
+        }
+
+        function saveHistory() {
+            const stateSnapshot = {
+                grid: grid.map(row => [...row]),
+                givens: givens.map(row => [...row]),
+                appMode: appMode
+            };
+            historyStack.push(stateSnapshot);
+            if (historyStack.length > 30) historyStack.shift();
+        }
+
+        function undoAction() {
+            if (historyStack.length === 0) {
+                showBanner('No previous actions to undo.', 'info');
+                return;
+            }
+            const prevState = historyStack.pop();
+            grid = prevState.grid;
+            givens = prevState.givens;
+            appMode = prevState.appMode;
+            setAppMode(appMode);
+            renderGrid();
+            showBanner('Last action undone.', 'info');
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('sudoku-grid');
+            container.innerHTML = '';
+
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'sudoku-cell bg-white dark:bg-slate-800 flex items-center justify-center text-lg sm:text-xl font-semibold cursor-pointer relative transition-colors duration-150';
+                    
+                    let borderClasses = '';
+                    if (c === 2 || c === 5) borderClasses += ' border-r-2 border-r-slate-400 dark:border-r-slate-500';
+                    if (r === 2 || r === 5) borderClasses += ' border-b-2 border-b-slate-400 dark:border-b-slate-500';
+                    cellDiv.className += borderClasses;
+
+                    const isSelected = selectedCell.r === r && selectedCell.c === c;
+                    const val = grid[r][c];
+                    const selectedVal = grid[selectedCell.r][selectedCell.c];
+
+                    if (isSelected) {
+                        cellDiv.classList.add('bg-indigo-100', 'dark:bg-indigo-950/80', 'ring-2', 'ring-indigo-600', 'z-10');
+                    } else if (selectedVal !== 0 && val === selectedVal) {
+                        cellDiv.classList.add('bg-indigo-50', 'dark:bg-indigo-900/30');
+                    } else if (selectedCell.r === r || selectedCell.c === c || (Math.floor(selectedCell.r/3) === Math.floor(r/3) && Math.floor(selectedCell.c/3) === Math.floor(c/3))) {
+                        cellDiv.classList.add('bg-slate-50', 'dark:bg-slate-700/40');
+                    }
+
+                    if (val !== 0) {
+                        const span = document.createElement('span');
+                        span.innerText = val;
+                        if (givens[r][c]) {
+                            span.className = 'text-slate-900 dark:text-white font-bold';
+                        } else {
+                            span.className = 'text-indigo-600 dark:text-indigo-400 font-semibold';
+                        }
+                        
+                        if (appMode === 'play' && !isPlacementValid(r, c, val, true)) {
+                            span.classList.add('text-rose-600', 'dark:text-rose-400', 'underline', 'decoration-wavy');
+                        }
+
+                        cellDiv.appendChild(span);
+                    } else {
+                        const marks = pencilMarks[r][c];
+                        if (marks && marks.size > 0) {
+                            const notesGrid = document.createElement('div');
+                            notesGrid.className = 'absolute inset-0 grid grid-cols-3 grid-rows-3 p-0.5 text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-medium pointer-events-none';
+                            for (let n = 1; n <= 9; n++) {
+                                const noteSpan = document.createElement('span');
+                                noteSpan.className = 'flex items-center justify-center';
+                                if (marks.has(n)) {
+                                    noteSpan.innerText = n;
+                                }
+                                notesGrid.appendChild(noteSpan);
+                            }
+                            cellDiv.appendChild(notesGrid);
+                        }
+                    }
+
+                    cellDiv.addEventListener('click', () => {
+                        selectedCell = { r, c };
+                        renderGrid();
+                    });
+
+                    container.appendChild(cellDiv);
+                }
+            }
+
+            currentVariant.drawOverlay();
+        }
+
+        function isPlacementValid(r, c, val, skipCurrentCheck = false) {
+            let temp = grid[r][c];
+            if (skipCurrentCheck) grid[r][c] = 0;
+
+            for (let i = 0; i < 9; i++) {
+                if (grid[r][i] === val || grid[i][c] === val) {
+                    if (skipCurrentCheck) grid[r][c] = temp;
+                    return false;
+                }
+            }
+            let br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    if (grid[br + i][bc + j] === val) {
+                        if (skipCurrentCheck) grid[r][c] = temp;
+                        return false;
+                    }
+                }
+            }
+
+            let variantValid = true;
+            if (customVerifierFunc) {
+                variantValid = customVerifierFunc(grid, r, c, val);
+            } else if (currentVariant && currentVariant.checkCustom) {
+                variantValid = currentVariant.checkCustom(grid, r, c, val);
+            }
+
+            if (skipCurrentCheck) grid[r][c] = temp;
+            return variantValid;
+        }
+
+        function togglePencilMode() {
+            pencilMode = !pencilMode;
+            document.getElementById('pencil-status').innerText = pencilMode ? 'ON' : 'OFF';
+            const btn = document.getElementById('btn-pencil-mode');
+            if (pencilMode) {
+                btn.classList.add('border-indigo-500', 'bg-indigo-50/50', 'dark:bg-indigo-950/30');
+            } else {
+                btn.classList.remove('border-indigo-500', 'bg-indigo-50/50', 'dark:bg-indigo-950/30');
+            }
+        }
+
+        function inputNumber(num) {
+            const { r, c } = selectedCell;
+            if (appMode === 'play' && givens[r][c]) return;
+
+            saveHistory();
+
+            if (num === 0) {
+                grid[r][c] = 0;
+                pencilMarks[r][c].clear();
+            } else if (pencilMode && appMode === 'play') {
+                if (grid[r][c] !== 0) return;
+                if (pencilMarks[r][c].has(num)) {
+                    pencilMarks[r][c].delete(num);
+                } else {
+                    pencilMarks[r][c].add(num);
+                }
+            } else {
+                if (grid[r][c] === num) {
+                    grid[r][c] = 0;
+                } else {
+                    grid[r][c] = num;
+                    pencilMarks[r][c].clear();
+                }
+                if (appMode === 'setup') {
+                    givens[r][c] = (grid[r][c] !== 0);
+                }
+            }
+
+            renderGrid();
+            if (appMode === 'play') checkWinCondition();
+        }
+
+        function handleKeyPress(e) {
+            const { r, c } = selectedCell;
+            if (e.key >= '1' && e.key <= '9') {
+                inputNumber(parseInt(e.key));
+            } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+                inputNumber(0);
+            } else if (e.key === 'ArrowUp' && r > 0) { selectedCell.r--; renderGrid(); }
+            else if (e.key === 'ArrowDown' && r < 8) { selectedCell.r++; renderGrid(); }
+            else if (e.key === 'ArrowLeft' && c > 0) { selectedCell.c--; renderGrid(); }
+            else if (e.key === 'ArrowRight' && c < 8) { selectedCell.c++; renderGrid(); }
+            else if (e.key.toLowerCase() === 'p') { togglePencilMode(); }
+        }
+
+        function autoAnnotateAll() {
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] === 0) {
+                        pencilMarks[r][c].clear();
+                        for (let n = 1; n <= 9; n++) {
+                            if (isPlacementValid(r, c, n)) {
+                                pencilMarks[r][c].add(n);
+                            }
+                        }
+                    }
+                }
+            }
+            renderGrid();
+            showBanner('Annotated candidate numbers in all empty cells based on active constraints!', 'success');
+        }
+
+        function clearPlayerNotes() {
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (!givens[r][c]) pencilMarks[r][c].clear();
+                }
+            }
+            renderGrid();
+            showBanner('Player pencil notes cleared.', 'info');
+        }
+
+        function checkSolution() {
+            let isComplete = true;
+            let hasErrors = false;
+
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    let val = grid[r][c];
+                    if (val === 0) {
+                        isComplete = false;
+                    } else if (!isPlacementValid(r, c, val, true)) {
+                        hasErrors = true;
+                    }
+                }
+            }
+
+            if (hasErrors) {
+                showBanner('Some numbers violate the active variant rules!', 'error');
+            } else if (!isComplete) {
+                showBanner('Current layout is valid so far, but incomplete.', 'info');
+            } else {
+                showBanner('Congratulations! Custom puzzle solved successfully!', 'success');
+                if (timerInterval) clearInterval(timerInterval);
+            }
+        }
+
+        function checkWinCondition() {
+            let isComplete = true;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] === 0 || !isPlacementValid(r, c, grid[r][c], true)) {
+                        isComplete = false;
+                    }
+                }
+            }
+            if (isComplete) {
+                if (timerInterval) clearInterval(timerInterval);
+                showBanner('Fantastic! Custom puzzle completed perfectly!', 'success');
+            }
+        }
+
+        function showBanner(msg, type = 'success') {
+            const banner = document.getElementById('status-banner');
+            const content = document.getElementById('status-banner-content');
+            
+            let bgClass = 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800';
+            let iconName = 'check-circle';
+            if (type === 'error') {
+                bgClass = 'bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-800';
+                iconName = 'alert-triangle';
+            } else if (type === 'info') {
+                bgClass = 'bg-indigo-50 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800';
+                iconName = 'info';
+            }
+
+            content.className = `p-4 rounded-2xl shadow-xl border text-center font-semibold text-sm flex items-center justify-center space-x-2 ${bgClass}`;
+            content.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5 shrink-0"></i><span>${msg}</span>`;
+            lucide.createIcons();
+
+            banner.classList.remove('-translate-y-20', 'opacity-0');
+            banner.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => { hideBanner(); }, 4000);
+        }
+
+        function hideBanner() {
+            const banner = document.getElementById('status-banner');
+            banner.classList.remove('translate-y-0', 'opacity-100');
+            banner.classList.add('-translate-y-20', 'opacity-0');
+        }
+
+        function populateVariantModalList() {
+            const container = document.getElementById('variant-list-container');
+            container.innerHTML = '';
+
+            Object.values(VARIANTS).forEach(v => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${currentVariant.id === v.id && !customVerifierFunc ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600'}`;
+                card.innerHTML = `
+                    <div>
+                        <h3 class="font-semibold text-sm text-slate-900 dark:text-white">${v.name}</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${v.description}</p>
+                    </div>
+                    <div class="mt-4 flex items-center text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                        <span>Select Variant</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5 ml-1"></i>
+                    </div>
+                `;
+                card.addEventListener('click', () => { selectVariant(v.id); });
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function selectVariant(id) {
+            currentVariant = VARIANTS[id];
+            customVerifierFunc = null;
+            document.getElementById('current-variant-name').innerText = currentVariant.name;
+            document.getElementById('current-variant-desc').innerText = currentVariant.description;
+            document.getElementById('variant-overlay').innerHTML = '';
+            closeVariantModal();
+            renderGrid();
+        }
+
+        function openVariantModal() {
+            populateVariantModalList();
+            document.getElementById('variant-modal').classList.remove('hidden');
+        }
+
+        function closeVariantModal() {
+            document.getElementById('variant-modal').classList.add('hidden');
+        }
+
+        function openRuleBuilderModal() {
+            document.getElementById('rule-builder-modal').classList.remove('hidden');
+        }
+
+        function closeRuleBuilderModal() {
+            document.getElementById('rule-builder-modal').classList.add('hidden');
+        }
+
+        function applyCustomRule() {
+            const name = document.getElementById('custom-rule-name').value;
+            const desc = document.getElementById('custom-rule-desc').value;
+            const code = document.getElementById('custom-rule-code').value;
+
+            try {
+                customVerifierFunc = new Function('grid', 'r', 'c', 'val', code);
+                currentVariant = {
+                    id: 'custom',
+                    name: name,
+                    description: desc,
+                    drawOverlay: () => {}
+                };
+
+                document.getElementById('current-variant-name').innerText = name;
+                document.getElementById('current-variant-desc').innerText = desc;
+                document.getElementById('variant-overlay').innerHTML = '';
+                
+                closeRuleBuilderModal();
+                renderGrid();
+                showBanner('Custom variant rule successfully compiled and applied!', 'success');
+            } catch (err) {
+                showBanner('Error in custom verifier code: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
