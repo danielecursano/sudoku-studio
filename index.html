@@ -130,6 +130,7 @@
   .cell.same { background: var(--same); }
   .cell.err { background: var(--error-bg); }
   .cell.sel { background: var(--sel); box-shadow: inset 0 0 0 2px var(--accent); }
+  .cell.custom-highlight::after { content: ''; position: absolute; inset: 3px; border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; }
   .cell .d { font-weight: 500; color: var(--user); }
   .cell.given .d { font-weight: 700; color: var(--given); }
   .cell.err .d { color: var(--error); }
@@ -237,13 +238,36 @@
       <div class="label">Custom rule</div>
       <input class="field" id="custom-name" value="My Custom Variant" aria-label="Variant name">
       <input class="field" id="custom-desc" value="Cells with special custom constraints." aria-label="Variant description">
-      <textarea class="field" id="custom-code" rows="8" spellcheck="false" aria-label="Verifier function body">// Function body of isValid(grid, r, c, val). Return true if val is allowed at (r, c).
-// grid is a 9x9 array of numbers (0 = empty).
-const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-for (const [dr, dc] of moves) {
-  const nr = r + dr, nc = c + dc;
-  if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
-    if (grid[nr][nc] === val) return false;
+      <p class="custom-hint" id="custom-cell-coordinates">Selected cell: r = 0, c = 0 (row 1, column 1). Coordinates are zero-based in the rule.</p>
+      <p class="custom-hint">Visual helpers: <code>highlight_cells([[r, c], ...])</code> outlines cells; <code>highlight_row(r)</code>, <code>highlight_column(c)</code>, and <code>highlight_box(r, c)</code> outline a whole row, column, or 3×3 box. Coordinates run from 0 to 8. These helpers only draw on the board; your function must still return true or false to enforce a rule. The drawing follows the selected cell.</p>
+      <p class="custom-hint">Possible next helpers: <code>draw_line(cells)</code> to connect cells in order, <code>shade_cells(cells, color)</code> to group cells by color, and <code>label_cell(r, c, text)</code> to show a small clue in a cell.</p>
+      <textarea class="field" id="custom-code" rows="8" spellcheck="false" aria-label="Verifier function body">const clonePairs = [
+  [[1, 2], [5, 5]],
+  [[1, 3], [5, 6]],
+  [[2, 1], [6, 4]],
+  [[2, 2], [6, 5]],
+  [[2, 3], [6, 6]],
+  [[2, 4], [6, 7]],
+  [[3, 2], [7, 5]],
+  [[3, 3], [7, 6]],
+  // Add your clone cell pairs here
+];
+
+// Highlight all cells belonging to the clone regions
+highlight_cells(clonePairs.flatMap(pair => pair));
+
+// Check clone constraints
+for (const [[r1, c1], [r2, c2]] of clonePairs) {
+  if (r === r1 && c === c1) {
+    if (grid[r2][c2] !== 0 && grid[r2][c2] !== val) {
+      return false;
+    }
+  }
+
+  if (r === r2 && c === c2) {
+    if (grid[r1][c1] !== 0 && grid[r1][c1] !== val) {
+      return false;
+    }
   }
 }
 return true;</textarea>
@@ -411,6 +435,28 @@ return true;</textarea>
   };
   let variant = VARIANTS.standard;
 
+  function customHelpers(highlighted) {
+    const highlight_cells = cells => {
+      if (!Array.isArray(cells)) throw new TypeError('highlight_cells expects an array of [r, c] pairs');
+      for (const cell of cells) {
+        if (!Array.isArray(cell) || cell.length !== 2 || !Number.isInteger(cell[0]) || !Number.isInteger(cell[1]) || !inB(cell[0], cell[1])) {
+          throw new TypeError('Each highlighted cell must be an [r, c] pair from 0 to 8');
+        }
+        highlighted.add(cell[0] * 9 + cell[1]);
+      }
+    };
+    return {
+      highlight_cells,
+      highlight_row: r => highlight_cells(Array.from({ length: 9 }, (_, c) => [r, c])),
+      highlight_column: c => highlight_cells(Array.from({ length: 9 }, (_, r) => [r, c])),
+      highlight_box: (r, c) => {
+        if (!Number.isInteger(r) || !Number.isInteger(c) || !inB(r, c)) throw new TypeError('highlight_box expects r and c from 0 to 8');
+        const br = r - r % 3, bc = c - c % 3;
+        highlight_cells(Array.from({ length: 9 }, (_, i) => [br + Math.floor(i / 3), bc + i % 3]));
+      }
+    };
+  }
+
   // ---------- Rules ----------
   // Is `val` allowed at (r,c), treating that cell as empty?
   function placementOk(r, c, val) {
@@ -421,7 +467,7 @@ return true;</textarea>
       const br = r - r % 3, bc = c - c % 3;
       for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (grid[br + i][bc + j] === val) return false;
       if (customFn) {
-        try { return !!customFn(grid, r, c, val); } catch (e) { return false; }
+        try { return !!customFn(grid, r, c, val, ...Object.values(customHelpers(new Set()))); } catch (e) { return false; }
       }
       return variant.check(grid, r, c, val);
     } finally { grid[r][c] = prev; }
@@ -455,6 +501,12 @@ return true;</textarea>
   // ---------- Rendering ----------
   function render() {
     const sv = grid[sel.r][sel.c];
+    const highlighted = new Set();
+    if (customFn) {
+      try {
+        customFn(grid.map(row => [...row]), sel.r, sel.c, sv || 1, ...Object.values(customHelpers(highlighted)));
+      } catch (e) { /* Invalid custom rules are shown as conflicts during validation. */ }
+    }
     let html = '', errors = 0, filled = 0;
     const counts = Array(10).fill(0);
 
@@ -485,6 +537,7 @@ return true;</textarea>
         if (isSel) cls.push('sel');
         else if (sv && v === sv) cls.push('same');
         else if (peer) cls.push('peer');
+        if (highlighted.has(r * 9 + c)) cls.push('custom-highlight');
 
         html += `<div class="${cls.join(' ')}" data-r="${r}" data-c="${c}" role="gridcell">${inner}</div>`;
       }
@@ -501,6 +554,7 @@ return true;</textarea>
     document.body.dataset.variant = customFn ? 'custom' : variant.id;
     $('variant-name').textContent = variant.name;
     $('variant-desc').textContent = variant.description;
+    $('custom-cell-coordinates').textContent = `Selected cell: r = ${sel.r}, c = ${sel.c} (row ${sel.r + 1}, column ${sel.c + 1}). Coordinates are zero-based in the rule.`;
 
     // Timer
     if (mode === 'play' && view === 'game') { solved ? stopTimer() : runTimer(); } else stopTimer();
@@ -517,7 +571,7 @@ return true;</textarea>
     // Toolbar / actions
     $('btn-undo').disabled = history.length === 0;
     $('btn-notes').setAttribute('aria-pressed', String(pencil));
-    $('btn-start').disabled = !(filled > 0 && errors === 0);
+    $('btn-start').disabled = errors !== 0;
     $('btn-new').classList.toggle('primary', solved);
 
     // Status line
@@ -525,7 +579,7 @@ return true;</textarea>
     let msg = '', cls = '';
     if (mode === 'setup') {
       if (errors) { msg = 'Some givens break the rules — shown in red.'; cls = 'err'; }
-      else if (!filled) msg = 'Select a cell and enter digits to set up the givens.';
+      else if (!filled) msg = 'Start with an empty grid, or enter digits to set up the givens.';
       else msg = `${filled} given${filled === 1 ? '' : 's'} set. Press Start when ready.`;
     } else if (solved) { msg = `Solved in ${fmt(seconds)} — well done!`; cls = 'ok'; }
     else if (errors) { msg = `${errors} cell${errors === 1 ? '' : 's'} break the rules.`; cls = 'err'; }
@@ -647,8 +701,8 @@ return true;</textarea>
     const code = $('custom-code').value;
     const err = $('custom-error');
     try {
-      const fn = new Function('grid', 'r', 'c', 'val', code);
-      fn(make(() => 0), 0, 0, 1);   // smoke test for runtime errors
+      const fn = new Function('grid', 'r', 'c', 'val', 'highlight_cells', 'highlight_row', 'highlight_column', 'highlight_box', code);
+      fn(make(() => 0), 0, 0, 1, ...Object.values(customHelpers(new Set())));   // smoke test for runtime errors
       customFn = fn;
       variant = {
         id: 'custom',
